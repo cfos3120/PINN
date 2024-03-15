@@ -1,0 +1,4 @@
+pyDOE
+numpy
+torch
+matplotlib
