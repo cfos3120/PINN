@@ -109,7 +109,8 @@ if __name__ == '__main__':
     model = get_model(default_model_args()).to(device)
     
     # Data Prepareation
-    xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=200,N_w=400,N_s=200,N_c=16000,N_r=10000)
+    #xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=200,N_w=400,N_s=200,N_c=16000,N_r=10000)
+    xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=10,N_w=10,N_s=10,N_c=10,N_r=10)
     print(f'Collocation Points: {xy_col.shape[0]}\nBoundary Points:{xy_bnd.shape[0]}\nComparison Channels:{uv_bnd.shape[-1]}')
     # Input Function (lid velocity)
     lid_velocity = 82.0
@@ -137,17 +138,22 @@ if __name__ == '__main__':
         optimizer.zero_grad()
 
         # Soft Enforce Boundary Conditions
+        if args.epochs == 1: print('- Inference (Boundary Nodes)')
         output = model(xy_bnd,g_u)
+        if args.epochs == 1: print('- MSE (Boundary Nodes)')
         bc_loss = loss_func(output[0,...,:2],uv_bnd)
 
         # Evaluate PDE
+        if args.epochs == 1: print('- Inference and Autograd (Collocation Nodes)')
         f0, f1, f2 = navier_stokes_autograd(model=model,inputs=[xy_col,g_u],loss_function=loss_func,Re=Re)
         pde_loss = (f0+f1+f2)/3
         total_loss = bc_loss+pde_loss
 
         # Backwards Step
+        if args.epochs == 1: print('- Backwards Pass')
         total_loss.backward(retain_graph=True)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1000.0)
+        if args.epochs == 1: print('- Optimizer Step')
         optimizer.step()
         scheduler.step()
 
