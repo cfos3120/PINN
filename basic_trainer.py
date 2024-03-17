@@ -4,6 +4,7 @@ from torch.autograd import grad
 from pyDOE import lhs
 import torch.nn as nn
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import shutil
 import argparse
@@ -159,8 +160,6 @@ class PINN_cavity:
         self.xy_col = xy_col
         self.uv_bnd = uv_bnd
 
-
-
 def plotLoss(losses_dict, info=["BC", "PDE", "f0", "f1", "f2"]):
     fig, axes = plt.subplots(1, 5, sharex=True, sharey=True, figsize=(10, 6))
     axes[0].set_yscale("log")
@@ -169,7 +168,11 @@ def plotLoss(losses_dict, info=["BC", "PDE", "f0", "f1", "f2"]):
         axes[i].set_title(j)
     plt.show()
 
-def getData_cavity(N_b,N_w,N_s,N_c,N_r):
+def getData_cavity(N_b,N_w,N_s,N_c,N_r, x_min=0.0,x_max = 1.0,y_min = 0.0,y_max = 1.0):
+    
+    ub = np.array([x_max, y_max])
+    lb = np.array([x_min, y_min])
+    
     inlet_x = np.random.uniform(x_min, x_max, (N_b, 1))
     inlet_y = np.ones((N_b, 1))*y_max
     inlet_u = np.ones((N_b, 1))
@@ -217,6 +220,58 @@ def getData_cavity(N_b,N_w,N_s,N_c,N_r):
     uv_bnd = torch.tensor(uv_bnd, dtype=torch.float32).to(device)
     xy_col = torch.tensor(xy_col, dtype=torch.float32).to(device)
     return xy_col, xy_bnd, uv_bnd
+
+def eval_model(model_checkpoint_path, x_min=0.0,x_max = 1.0,y_min = 0.0,y_max = 1.0,resolution = 1000, show_fig=False):
+    
+    ub = np.array([x_max, y_max])
+    lb = np.array([x_min, y_min])
+
+    pinn = PINN_cavity(ub=ub,lb=lb)
+    pinn.net.load_state_dict(torch.load(model_checkpoint_path,map_location=torch.device('cpu')))
+
+    x = np.arange(resolution)/(resolution-1)
+    y = np.arange(resolution)/(resolution-1)
+    #x = np.arange(x_min, x_max, 0.001)
+    #y = np.arange(y_min, y_max, 0.001)
+    X, Y = np.meshgrid(x, y)
+    x = X.reshape(-1, 1)
+    y = Y.reshape(-1, 1)
+
+    #dst_from_cyl = np.sqrt((x - xc) ** 2 + (y - yc) ** 2)
+    #cyl_mask = dst_from_cyl > r
+
+    xy = np.concatenate([x, y], axis=1)
+    xy = torch.tensor(xy, dtype=torch.float32)#.to(device)
+
+    with torch.no_grad():
+        u, v, p = pinn.predict(xy)
+        u = u.cpu().numpy().reshape(Y.shape)
+        #u = np.where(cyl_mask, u, np.nan).reshape(Y.shape)
+        v = v.cpu().numpy().reshape(Y.shape)
+        #v = np.where(cyl_mask, v, np.nan).reshape(Y.shape)
+        p = p.cpu().numpy().reshape(Y.shape)
+        #p = np.where(cyl_mask, p, np.nan).reshape(Y.shape)
+
+    data = (u, v, p)
+    labels = ["$u(x,y)$", "$v(x,y)$", "$p(x,y)$"]
+
+    if show_fig:
+        fig, axes = plt.subplots(3, 1, figsize=(11, 12), sharex=True)
+        for i in range(3):
+            ax = axes[i]
+            im = ax.imshow(
+                data[i], cmap="rainbow", extent=[x_min, x_max, y_min, y_max], origin="lower"
+            )
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="3%", pad="3%")
+            fig.colorbar(im, cax=cax, label=labels[i])
+            ax.set_title(labels[i])
+            ax.set_xlabel("$x$")
+            ax.set_ylabel("$y$")
+            ax.set_aspect("equal")
+        fig.tight_layout()
+
+    return data
 
 if __name__ == '__main__':
 
