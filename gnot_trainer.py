@@ -109,7 +109,7 @@ if __name__ == '__main__':
     model = get_model(default_model_args()).to(device)
     
     # Data Prepareation
-    xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=200,N_w=400,N_s=200,N_c=40000,N_r=10000)
+    xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=200,N_w=400,N_s=200,N_c=16000,N_r=10000)
     print(f'Collocation Points: {xy_col.shape[0]}\nBoundary Points:{xy_bnd.shape[0]}\nComparison Channels:{uv_bnd.shape[-1]}')
     # Input Function (lid velocity)
     lid_velocity = 82.0
