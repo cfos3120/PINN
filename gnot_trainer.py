@@ -6,6 +6,7 @@ from models.gnot_utils import MultipleTensors
 from basic_trainer import getData_cavity
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print(f'device:{device}')
 
 def get_model(model_args):
     return CGPTNO(
