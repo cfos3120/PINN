@@ -138,7 +138,7 @@ if __name__ == '__main__':
 
         # Soft Enforce Boundary Conditions
         output = model(xy_bnd,g_u)
-        bc_loss = loss_func(output[...,:2],uv_bnd.squeeze(0))
+        bc_loss = loss_func(output[0,...,:2],uv_bnd)
 
         # Evaluate PDE
         f0, f1, f2 = navier_stokes_autograd(model=model,inputs=[xy_col,g_u],loss_function=loss_func,Re=Re)
