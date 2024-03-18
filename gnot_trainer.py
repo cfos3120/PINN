@@ -110,15 +110,15 @@ if __name__ == '__main__':
     model = get_model(default_model_args()).to(device)
     
     # Data Prepareation
-    #xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=200,N_w=400,N_s=200,N_c=16000,N_r=10000)
-    xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=10,N_w=10,N_s=10,N_c=10,N_r=10)
+    xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=200,N_w=400,N_s=200,N_c=4100,N_r=10000)
+    #xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=10,N_w=10,N_s=10,N_c=10,N_r=10)
     print(f'Collocation Points: {xy_col.shape[0]}\nBoundary Points:{xy_bnd.shape[0]}\nComparison Channels:{uv_bnd.shape[-1]}')
     # Input Function (lid velocity)
     lid_velocity = 82.0
     nu = 0.01
     L = 0.1
     Re = lid_velocity * L/nu
-    g_u = MultipleTensors(torch.tensor([lid_velocity]).reshape(1,1,1,1))
+    g_u = MultipleTensors(torch.tensor([lid_velocity]).reshape(1,1,1,1)).to(device)
     
     out = model(x=xy_col, inputs=g_u)
 
