@@ -64,7 +64,7 @@ def navier_stokes_autograd(model,inputs,loss_function,Re=100):
     output = model(input,g_u)
     
     # Stack and Repeat Re for tensor multiplication
-    Re = torch.tensor([Re]).reshape(1,1).repeat(output.shape[0],1)
+    Re = torch.tensor([Re]).reshape(1,1).repeat(output.shape[0],1).to(device)
     
     u = output[..., 0:1]
     v = output[..., 1:2]
