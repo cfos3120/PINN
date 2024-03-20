@@ -102,6 +102,23 @@ def navier_stokes_autograd(model,inputs,loss_function,Re=100):
     f2_loss = loss_function(f2,torch.zeros_like(f2))
     return f0_loss, f1_loss, f2_loss
 
+def navier_stokes_autograd_bc(model,inputs,loss_function):
+    # Enable autograd:
+    input, g_u = inputs
+    input.requires_grad = True
+
+    output = model(input,g_u)
+    p = output[..., 2:3]
+
+    # Velocity Boundary Conditions
+    bc_loss_1 = loss_function(output[0,...],uv_bnd)
+
+    # Pressure (Zero Gradient) 
+    p_out = torch.autograd.grad(p.sum(), input, create_graph=True)[0]
+    bc_loss_2 = loss_function(p_out,torch.zeros_like(p_out))
+
+    return bc_loss_1 + bc_loss_2
+
 
 
 if __name__ == '__main__':
@@ -119,14 +136,12 @@ if __name__ == '__main__':
     L = 0.1
     Re = lid_velocity * L/nu
     g_u = MultipleTensors(torch.tensor([lid_velocity]).reshape(1,1,1,1)).to(device)
-    
-    out = model(x=xy_col, inputs=g_u)
 
     # Training Setup
     args = get_args()
     milestones = np.linspace(0,args.epochs,6,dtype=int)[1:-1]
     optimizer = torch.optim.AdamW(model.parameters(), betas=(0.9, 0.999), lr=0.001, weight_decay=0.00005)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.05)
+    #scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.05)
     loss_func = get_loss_criterion(args.loss_criterion)
     print(f'Using AdamW Optimzer, With Multi-Step Scheduler on Epochs {milestones}')
     recorded_losses = {"bc": [], "outlet": [], "pde": [], "f0": [], "f1": [], "f2": []}
@@ -140,9 +155,7 @@ if __name__ == '__main__':
 
         # Soft Enforce Boundary Conditions
         if args.epochs == 1: print('- Inference (Boundary Nodes)')
-        output = model(xy_bnd,g_u)
-        if args.epochs == 1: print('- MSE (Boundary Nodes)')
-        bc_loss = loss_func(output[0,...],uv_bnd)
+        bc_loss = navier_stokes_autograd_bc(model,inputs=[xy_bnd,g_u],loss_function=loss_func)
 
         # Evaluate PDE
         if args.epochs == 1: print('- Inference and Autograd (Collocation Nodes)')
@@ -156,7 +169,7 @@ if __name__ == '__main__':
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1000.0)
         if args.epochs == 1: print('- Optimizer Step')
         optimizer.step()
-        scheduler.step()
+        #scheduler.step()
 
         # Store Results
         recorded_losses["bc"].append(bc_loss.detach().cpu().item())
