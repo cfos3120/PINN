@@ -111,7 +111,7 @@ def navier_stokes_autograd_bc(model,inputs,loss_function):
     p = output[..., 2:3]
 
     # Velocity Boundary Conditions
-    bc_loss_1 = loss_function(output[0,...],uv_bnd)
+    bc_loss_1 = loss_function(output[0,...,0:2],uv_bnd[...,0:2])
 
     # Pressure (Zero Gradient) 
     p_out = torch.autograd.grad(p.sum(), input, create_graph=True)[0]
