@@ -142,7 +142,7 @@ if __name__ == '__main__':
         if args.epochs == 1: print('- Inference (Boundary Nodes)')
         output = model(xy_bnd,g_u)
         if args.epochs == 1: print('- MSE (Boundary Nodes)')
-        bc_loss = loss_func(output[0,...,:2],uv_bnd)
+        bc_loss = loss_func(output[0,...],uv_bnd)
 
         # Evaluate PDE
         if args.epochs == 1: print('- Inference and Autograd (Collocation Nodes)')

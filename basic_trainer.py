@@ -177,15 +177,16 @@ def getData_cavity(N_b,N_w,N_s,N_c,N_r, x_min=0.0,x_max = 1.0,y_min = 0.0,y_max 
     inlet_y = np.ones((N_b, 1))*y_max
     inlet_u = np.ones((N_b, 1))
     inlet_v = np.zeros((N_b, 1))
+    inlet_p = np.zeros((N_b, 1))
     inlet_xy = np.concatenate([inlet_x, inlet_y], axis=1)
-    inlet_uv = np.concatenate([inlet_u, inlet_v], axis=1)
+    inlet_uv = np.concatenate([inlet_u, inlet_v, inlet_p], axis=1)
 
     lwall_xy = np.random.uniform([x_min, y_min], [x_min, y_max], (N_w, 2))
     rwall_xy = np.random.uniform([x_max, y_min], [x_max, y_max], (N_w, 2))
     bwall_xy = np.random.uniform([x_min, y_min], [x_max, y_min], (N_w, 2))
-    lwall_uv = np.zeros((N_w, 2))
-    rwall_uv = np.zeros((N_w, 2))
-    bwall_uv = np.zeros((N_w, 2))
+    lwall_uv = np.zeros((N_w, 3))
+    rwall_uv = np.zeros((N_w, 3))
+    bwall_uv = np.zeros((N_w, 3))
 
     # cylinder surface, u=v=0
     # theta = np.linspace(0.0, 2 * np.pi, N_s)
