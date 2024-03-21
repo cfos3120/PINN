@@ -75,6 +75,13 @@ def navier_stokes_autograd(model,inputs,loss_function,Re=100):
     v_out = torch.autograd.grad(v.sum(), input, create_graph=True)[0]
     p_out = torch.autograd.grad(p.sum(), input, create_graph=True)[0]
 
+    #Pressure Boundary
+    lid_coords  = torch.where((input[:,1] == 1.0))[0]
+    lw_coords   = torch.where((input[:,0] == 0.0))[0]
+    rw_coords   = torch.where((input[:,0] == 1.0))[0]
+    bw_coords   = torch.where((input[:,1] == 0.0))[0]
+    p_bc        = torch.concat([p_out[lid_coords,:],p_out[lw_coords,:],p_out[rw_coords,:],p_out[bw_coords,:]],axis=0)
+
     u_x = u_out[..., 0:1]
     u_y = u_out[..., 1:2]
 
@@ -100,26 +107,18 @@ def navier_stokes_autograd(model,inputs,loss_function,Re=100):
     f0_loss = loss_function(f0,torch.zeros_like(f0))
     f1_loss = loss_function(f1,torch.zeros_like(f1))
     f2_loss = loss_function(f2,torch.zeros_like(f2))
-    return f0_loss, f1_loss, f2_loss
+    p_bc_loss = loss_function(p_bc,torch.zeros_like(p_bc))
+
+    return f0_loss, f1_loss, f2_loss, p_bc_loss
 
 def navier_stokes_autograd_bc(model,inputs,loss_function):
-    # Enable autograd:
     input, g_u = inputs
-    input.requires_grad = True
-
     output = model(input,g_u)
-    p = output[..., 2:3]
 
     # Velocity Boundary Conditions
     bc_loss_1 = loss_function(output[0,...,0:2],uv_bnd[...,0:2])
 
-    # Pressure (Zero Gradient) 
-    p_out = torch.autograd.grad(p.sum(), input, create_graph=True)[0]
-    bc_loss_2 = loss_function(p_out,torch.zeros_like(p_out))
-
-    return bc_loss_1 + bc_loss_2
-
-
+    return bc_loss_1
 
 if __name__ == '__main__':
     
@@ -155,12 +154,13 @@ if __name__ == '__main__':
 
         # Soft Enforce Boundary Conditions
         if args.epochs == 1: print('- Inference (Boundary Nodes)')
-        bc_loss = navier_stokes_autograd_bc(model,inputs=[xy_bnd,g_u],loss_function=loss_func)
+        u_bc_loss = navier_stokes_autograd_bc(model,inputs=[xy_bnd,g_u],loss_function=loss_func)
 
         # Evaluate PDE
         if args.epochs == 1: print('- Inference and Autograd (Collocation Nodes)')
-        f0, f1, f2 = navier_stokes_autograd(model=model,inputs=[xy_col,g_u],loss_function=loss_func,Re=Re)
+        f0, f1, f2, p_bc_loss = navier_stokes_autograd(model=model,inputs=[xy_col,g_u],loss_function=loss_func,Re=Re)
         pde_loss = (f0+f1+f2)/3
+        bc_loss  = (p_bc_loss + u_bc_loss)/2
         total_loss = bc_loss+pde_loss
 
         # Backwards Step
