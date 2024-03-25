@@ -62,7 +62,8 @@ def navier_stokes_autograd(model,inputs,loss_function,Re=100):
     input.requires_grad = True
 
     output = model(input,g_u)
-    
+    #output = x_normalizer.transform(output, inverse=True)
+
     # Stack and Repeat Re for tensor multiplication
     Re = torch.tensor([Re]).reshape(1,1).repeat(output.shape[0],1).to(device)
     
@@ -76,11 +77,13 @@ def navier_stokes_autograd(model,inputs,loss_function,Re=100):
     p_out = torch.autograd.grad(p.sum(), input, create_graph=True)[0]
 
     #Pressure Boundary
-    lid_coords  = torch.where((input[:,1] == 1.0))[0]
-    lw_coords   = torch.where((input[:,0] == 0.0))[0]
-    rw_coords   = torch.where((input[:,0] == 1.0))[0]
-    bw_coords   = torch.where((input[:,1] == 0.0))[0]
+    input_real = x_normalizer.transform(input.clone(), inverse=True)
+    lid_coords  = torch.where((input_real[:,1] == 1.0))[0]
+    lw_coords   = torch.where((input_real[:,0] == 0.0))[0]
+    rw_coords   = torch.where((input_real[:,0] == 1.0))[0]
+    bw_coords   = torch.where((input_real[:,1] == 0.0))[0]
     p_bc        = torch.concat([p_out[lid_coords,:],p_out[lw_coords,:],p_out[rw_coords,:],p_out[bw_coords,:]],axis=0)
+
 
     u_x = u_out[..., 0:1]
     u_y = u_out[..., 1:2]
@@ -114,12 +117,39 @@ def navier_stokes_autograd(model,inputs,loss_function,Re=100):
 def navier_stokes_autograd_bc(model,inputs,loss_function):
     input, g_u = inputs
     output = model(input,g_u)
+    output = x_normalizer.transform(output, inverse=True)
 
     # Velocity Boundary Conditions
+    print(output.shape, uv_bnd.shape)
     bc_loss_1 = loss_function(output[0,...,0:2],uv_bnd[...,0:2])
 
     return bc_loss_1
 
+class UnitTransformer():
+    def __init__(self, X):
+        self.mean = X.mean(dim=0, keepdim=True)
+        self.std = X.std(dim=0, keepdim=True) + 1e-8
+
+
+    def to(self, device):
+        self.mean = self.mean.to(device)
+        self.std = self.std.to(device)
+        return self
+
+    def transform(self, X, inverse=True,component='all'):
+        if component == 'all' or 'all-reduce':
+            if inverse:
+                orig_shape = X.shape
+                return (X*(self.std - 1e-8) + self.mean).view(orig_shape)
+            else:
+                return (X-self.mean)/self.std
+        else:
+            if inverse:
+                orig_shape = X.shape
+                return (X*(self.std[:,component] - 1e-8)+ self.mean[:,component]).view(orig_shape)
+            else:
+                return (X - self.mean[:,component])/self.std[:,component]
+            
 if __name__ == '__main__':
     
     # Construct Default Model
@@ -129,10 +159,17 @@ if __name__ == '__main__':
     xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=100,N_w=100,N_s=200,N_c=1000,N_r=10000)
     #xy_col, xy_bnd, uv_bnd = getData_cavity(N_b=10,N_w=10,N_s=10,N_c=10,N_r=10)
     print(f'Collocation Points: {xy_col.shape[0]}\nBoundary Points:{xy_bnd.shape[0]}\nComparison Channels:{uv_bnd.shape[-1]}')
+
+    # Unit transform data 
+    x_normalizer = UnitTransformer(xy_col.flatten())
+    
+    xy_col = x_normalizer.transform(xy_col, inverse=False)
+    xy_bnd = x_normalizer.transform(xy_bnd, inverse=False)    
+
     # Input Function (lid velocity)
     lid_velocity = 82.0
     nu = 0.01
-    L = 0.1
+    L = 0.1                                                                      
     Re = lid_velocity * L/nu
     g_u = MultipleTensors(torch.tensor([lid_velocity]).reshape(1,1,1,1)).to(device)
 
@@ -145,6 +182,7 @@ if __name__ == '__main__':
     print(f'Using AdamW Optimzer, With Multi-Step Scheduler on Epochs {milestones}')
     recorded_losses = {"bc": [], "outlet": [], "pde": [], "f0": [], "f1": [], "f2": []}
     # send to device
+    x_normalizer = x_normalizer.to(device)
     xy_col, xy_bnd, uv_bnd = xy_col.to(device), xy_bnd.to(device), uv_bnd.to(device)
     
     # Train Model
@@ -180,4 +218,4 @@ if __name__ == '__main__':
 
     # Save Model and Losses
     torch.save(model.state_dict(), f"{args.name}_model_weights.pt")
-    np.save(f"{args.name}_training_losses.pt", recorded_losses, allow_pickle=True)
+    np.save(f"{args.name}_training_losses", recorded_losses, allow_pickle=True)
