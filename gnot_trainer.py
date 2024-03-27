@@ -82,6 +82,8 @@ def navier_stokes_autograd(model,inputs,loss_function,Re=100):
     lw_coords   = torch.where((input_real[:,0] == 0.0))[0]
     rw_coords   = torch.where((input_real[:,0] == 1.0))[0]
     bw_coords   = torch.where((input_real[:,1] == 0.0))[0]
+
+    # this is currently soft enforced
     p_bc        = torch.concat([p_out[lid_coords,:],p_out[lw_coords,:],p_out[rw_coords,:],p_out[bw_coords,:]],axis=0)
 
 

@@ -100,6 +100,14 @@ class PINN_cavity:
         v_out = grad(v.sum(), xy, create_graph=True)[0]
         p_out = grad(p.sum(), xy, create_graph=True)[0]
 
+        lid_coords  = torch.where((xy[:,1] == 1.0))[0]
+        lw_coords   = torch.where((xy[:,0] == 0.0))[0]
+        rw_coords   = torch.where((xy[:,0] == 1.0))[0]
+        bw_coords   = torch.where((xy[:,1] == 0.0))[0]
+
+        # this is currently soft enforced
+        p_bc        = torch.concat([p_out[lid_coords,:],p_out[lw_coords,:],p_out[rw_coords,:],p_out[bw_coords,:]],axis=0)
+
         u_x = u_out[:, 0:1]
         u_y = u_out[:, 1:2]
 
@@ -124,9 +132,10 @@ class PINN_cavity:
         mse_f0 = torch.mean(torch.square(f0))
         mse_f1 = torch.mean(torch.square(f1))
         mse_f2 = torch.mean(torch.square(f2))
-        mse_pde = mse_f0 + mse_f1 + mse_f2
+        mse_bc_p = torch.mean(torch.square(p_bc))
+        mse_pde = mse_f0 + mse_f1 + mse_f2 + mse_bc_p
 
-        return mse_pde, mse_f0.detach().cpu().item(), mse_f1.detach().cpu().item(), mse_f2.detach().cpu().item()
+        return mse_pde, mse_f0.detach().cpu().item(), mse_f1.detach().cpu().item(), mse_f2.detach().cpu().item(), mse_bc_p.detach().cpu().item()
 
     def closure(self):
         self.lbfgs.zero_grad()
@@ -134,7 +143,7 @@ class PINN_cavity:
 
         mse_bc = self.bc_loss(self.xy_bnd, self.uv_bnd)
         #mse_outlet = self.outlet_loss(xy_outlet)
-        mse_pde, mse_f0, mse_f1, mse_f2 = self.pde_loss(self.xy_col)
+        mse_pde, mse_f0, mse_f1, mse_f2,__ = self.pde_loss(self.xy_col)
         #loss = mse_bc + mse_outlet + mse_pde
         loss = mse_bc + mse_pde
 
@@ -278,7 +287,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='MLP PINN Training Study')
     parser.add_argument('--name', type=str, default='test')
-    parser.add_argument('--Re', type=float, default='test')
+    parser.add_argument('--Re', type=float, default=830)
     args = parser.parse_args()
 
     x_min = 0.0
@@ -306,9 +315,9 @@ if __name__ == '__main__':
     for i in range(10000):
         pinn.closure()
         pinn.adam.step()
-    torch.save(pinn.net.state_dict(), "model_weights_adam.pt")
+    torch.save(pinn.net.state_dict(), "basic_model_weights_adam.pt")
     pinn.lbfgs.step(pinn.closure)
-    torch.save(pinn.net.state_dict(), "model_weights.pt")
+    torch.save(pinn.net.state_dict(), "basic_model_weights_lbfgs.pt")
     #plotLoss(pinn.losses)
 
-    np.save('training_losses.npy',pinn.losses, allow_pickle=True)
+    np.save('basic_training_losses.npy',pinn.losses, allow_pickle=True)
