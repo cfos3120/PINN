@@ -53,7 +53,7 @@ training again with LBFGS.
 
 class MLP_cavity:
     def __init__(self, ub, lb, lid_velocity=100, L=1, nu=0.05) -> None:
-        self.net = DNN(dim_in=2, dim_out=3, n_layer=4, n_node=40, ub=ub, lb=lb).to(device)
+        self.net = DNN(dim_in=2, dim_out=6, n_layer=4, n_node=40, ub=ub, lb=lb).to(device)
         self.lbfgs = torch.optim.LBFGS(
             self.net.parameters(),
             lr=1.0,
